@@ -1,14 +1,30 @@
 # alert-noise-auditor
 
-> Analyze alert history to find flapping, never-actioned and duplicate alerts, and suggest threshold changes or deletions.
+Analyze alert history to find flapping, never-actioned and duplicate alerts, and suggest threshold changes or deletions.
 
-**Status:** 🚧 Early stage — design and roadmap published, implementation in progress. Stars, issues and ideas welcome.
+> **Project status: planning. There is no working code in this repository yet.**
+> This README describes what the project will do. Nothing below can be installed or run today.
+> Features are ticked off in the checklist as they are built.
 
-## Why
+## What it is
 
-Alert fatigue makes on-call miserable and causes real pages to be ignored.
+A command-line tool.
+
+**The problem it solves:** Alert fatigue makes on-call miserable and causes real pages to be ignored.
+
+## Who it is for
+
+On-call teams suffering from too many alerts.
+
+## How it will work
+
+1. You export or connect your alert history.
+2. The tool finds alerts that flap, alerts nobody ever acts on and alerts that duplicate each other.
+3. It writes a report recommending which alerts to delete, tune or keep, with suggested thresholds.
 
 ## Planned features
+
+Unticked items are not built yet.
 
 - [ ] Import from PagerDuty, Opsgenie, Alertmanager
 - [ ] Detect flapping, never-actioned and duplicate alerts
@@ -16,24 +32,17 @@ Alert fatigue makes on-call miserable and causes real pages to be ignored.
 - [ ] Suggested threshold / for-duration changes
 - [ ] Report with delete / tune / keep recommendations
 
-## Intended usage
+## Planned usage
 
-```
+This is the intended interface, shown so you can judge the design. **It does not work yet**, and names may change before the first release.
+
+```bash
 alert-noise-auditor analyze --source pagerduty --days 30
 ```
 
-_The interface above is the target design and may change._
-
-## Roadmap
-
-1. Core implementation of the first feature set
-2. Examples and tests
-3. CI and first tagged release
-4. Docs and integrations
-
 ## Contributing
 
-Contributions are welcome. Open an issue to discuss an idea or pick an unchecked item from the feature list.
+Feedback on the design is the most useful contribution right now. Open an issue to suggest a feature, question an approach or describe your use case. Code contributions are welcome once the first version lands.
 
 ## License
 
