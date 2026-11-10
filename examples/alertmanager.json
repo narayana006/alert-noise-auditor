@@ -1,0 +1,227 @@
+[
+  {
+    "labels": {
+      "alertname": "KafkaConsumerLag",
+      "job": "orders-consumer",
+      "severity": "critical",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "KafkaConsumerLag on orders-consumer-0"
+    },
+    "startsAt": "2026-11-01T10:30:00.000Z",
+    "endsAt": "2026-11-01T10:52:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "842e7fc229540a6e"
+  },
+  {
+    "labels": {
+      "alertname": "QueueDepthHigh",
+      "job": "orders-consumer",
+      "severity": "warning",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "QueueDepthHigh on orders-consumer-0"
+    },
+    "startsAt": "2026-11-01T10:30:45.000Z",
+    "endsAt": "2026-11-01T10:50:45.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "3488f87605e999f3"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T06:12:00.000Z",
+    "endsAt": "2026-11-02T06:14:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "4fd58dbe7bdc968b"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T06:20:00.000Z",
+    "endsAt": "2026-11-02T06:22:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "24e4e25a15fc899e"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T06:29:00.000Z",
+    "endsAt": "2026-11-02T06:31:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "bfeaa1551a28f7b3"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T06:39:00.000Z",
+    "endsAt": "2026-11-02T06:41:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "bd87a86557b6fb7e"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T06:50:00.000Z",
+    "endsAt": "2026-11-02T06:52:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "7a86f7a243c71b9a"
+  },
+  {
+    "labels": {
+      "alertname": "HighMemoryUsage",
+      "job": "node",
+      "severity": "warning",
+      "instance": "node-7:9100"
+    },
+    "annotations": {
+      "summary": "HighMemoryUsage on node-7:9100"
+    },
+    "startsAt": "2026-11-02T07:02:00.000Z",
+    "endsAt": "2026-11-02T07:04:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "b12aa1f6d42fddbb"
+  },
+  {
+    "labels": {
+      "alertname": "KafkaConsumerLag",
+      "job": "orders-consumer",
+      "severity": "critical",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "KafkaConsumerLag on orders-consumer-0"
+    },
+    "startsAt": "2026-11-03T15:30:00.000Z",
+    "endsAt": "2026-11-03T15:52:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "f3b7a50df373ca53"
+  },
+  {
+    "labels": {
+      "alertname": "QueueDepthHigh",
+      "job": "orders-consumer",
+      "severity": "warning",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "QueueDepthHigh on orders-consumer-0"
+    },
+    "startsAt": "2026-11-03T15:30:45.000Z",
+    "endsAt": "2026-11-03T15:50:45.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "5c9bcf35873be078"
+  },
+  {
+    "labels": {
+      "alertname": "InstanceDown",
+      "job": "blackbox",
+      "severity": "critical",
+      "instance": "edge-2:9115"
+    },
+    "annotations": {
+      "summary": "InstanceDown on edge-2:9115"
+    },
+    "startsAt": "2026-11-04T03:02:00.000Z",
+    "endsAt": "2026-11-04T03:43:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "a49636a2fa7f0eab"
+  },
+  {
+    "labels": {
+      "alertname": "KafkaConsumerLag",
+      "job": "orders-consumer",
+      "severity": "critical",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "KafkaConsumerLag on orders-consumer-0"
+    },
+    "startsAt": "2026-11-05T11:30:00.000Z",
+    "endsAt": "2026-11-05T11:52:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "b0a844e52587be6b"
+  },
+  {
+    "labels": {
+      "alertname": "QueueDepthHigh",
+      "job": "orders-consumer",
+      "severity": "warning",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "QueueDepthHigh on orders-consumer-0"
+    },
+    "startsAt": "2026-11-05T11:30:45.000Z",
+    "endsAt": "2026-11-05T11:50:45.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "ea0575438b0d590b"
+  },
+  {
+    "labels": {
+      "alertname": "KafkaConsumerLag",
+      "job": "orders-consumer",
+      "severity": "critical",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "KafkaConsumerLag on orders-consumer-0"
+    },
+    "startsAt": "2026-11-06T21:30:00.000Z",
+    "endsAt": "2026-11-06T21:52:00.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "c215a82a06ec41ad"
+  },
+  {
+    "labels": {
+      "alertname": "QueueDepthHigh",
+      "job": "orders-consumer",
+      "severity": "warning",
+      "instance": "orders-consumer-0"
+    },
+    "annotations": {
+      "summary": "QueueDepthHigh on orders-consumer-0"
+    },
+    "startsAt": "2026-11-06T21:30:45.000Z",
+    "endsAt": "2026-11-06T21:50:45.000Z",
+    "generatorURL": "http://prometheus.example.internal/graph",
+    "fingerprint": "4c4f9b0687322e25"
+  }
+]
