@@ -2,7 +2,7 @@
 
 Reads an export of your alert history and tells you which alerts are noise: the ones that flap, the ones nobody ever acknowledges, and the ones that duplicate another alert. Each alert gets a noise score and a keep / tune / delete recommendation.
 
-**Status:** v0.1.0, usable from the command line with file input. Working today: CSV, JSON and Alertmanager-style JSON input; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: pulling history directly from PagerDuty, Opsgenie or a live Alertmanager, and threshold suggestions.
+**Status:** v0.1.0, usable from the command line. Working today: CSV, JSON and Alertmanager-style JSON input; reading incident history straight from PagerDuty; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: pulling history directly from Opsgenie or a live Alertmanager, and threshold suggestions.
 
 ## Install
 
@@ -126,22 +126,41 @@ alert-noise-auditor analyze examples/alertmanager.json
 
 Note that Alertmanager's API only returns alerts that are currently active or recently resolved. To audit a longer period you need to collect its webhook notifications, or export the history from your paging tool into the CSV format above.
 
+### Straight from PagerDuty
+
+With a PagerDuty REST API key in `PAGERDUTY_API_TOKEN` (a read-only key is enough), the tool reads the incident history itself instead of a file:
+
+```bash
+export PAGERDUTY_API_TOKEN=...   # read-only REST API key
+alert-noise-auditor analyze --source pagerduty --days 30 --save pd-history.csv
+```
+
+- It sends only `GET` requests: `/incidents` for every incident created in the last `--days` days (default 30, counted back from now), and `/log_entries?is_overview=true` for acknowledgement times, which PagerDuty drops from the incident once it is resolved.
+- One incident is one firing. The incident **title** is the alert name, the PagerDuty **service name** is the service, and the urgency is the severity. The earliest acknowledgement in the log is the acknowledged time; the incident's `resolved_at` (or its resolve log entry) is the resolved time; incidents still open count as unresolved.
+- `--pagerduty-service ID` (repeatable) limits the incidents to those services.
+- `--save FILE.csv` writes what was fetched in the CSV input format above, so you can re-run the analysis with other settings without calling the API again.
+- PagerDuty's list endpoints page by offset and stop at 10,000 records. If the window holds more incidents or log entries than that, the tool stops with an error asking for a shorter `--days` or a service filter, rather than analysing a partial history.
+
+This was tested against recorded API responses, not a live account. If your incident titles carry per-instance detail (host names, numbers), each variant is treated as its own alert; in that case `--save` the history, normalise the `name` column, and analyse the CSV.
+
 ## Options
 
 ```text
-alert-noise-auditor analyze [--input-format {auto,csv,json}] [--format {markdown,json}]
+alert-noise-auditor analyze [--source {file,pagerduty}] [--pagerduty-service ID] [--save CSV]
+                            [--input-format {auto,csv,json}] [--format {markdown,json}]
                             [--days N] [--top N] [--flap-gap MIN] [--duplicate-window SEC]
-                            [--min-firings N] [--fail-on-delete] FILE
+                            [--min-firings N] [--fail-on-delete] [FILE]
 ```
 
-- `FILE`: the export, or `-` for stdin. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
-- `--days N`: use only the last N days of the file, counted back from the newest event in it (not from today).
+- `FILE`: the export, or `-` for stdin. Required with the default `--source file`, not allowed with `--source pagerduty`. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
+- `--days N`: use only the last N days of the file, counted back from the newest event in it (not from today). With `--source pagerduty` it is the fetch window, counted back from now (default 30).
+- `--save CSV`: also write the loaded history as CSV.
 - `--format json`: the full per-alert statistics as JSON, for dashboards or further scripting.
 - `--top N`: show only the N noisiest alerts in the Markdown report.
 - `--flap-gap MIN` (default 30), `--duplicate-window SEC` (default 120), `--min-firings N` (default 3): detection settings, explained below.
 - `--fail-on-delete`: exit with status 1 when any alert is recommended for deletion.
 
-Exit status is 0 on success and 2 when the input cannot be read or parsed (the message names the offending line or record).
+Exit status is 0 on success and 2 when the input cannot be read or parsed (the message names the offending line or record) or PagerDuty cannot be read (missing token, HTTP error).
 
 ## How the analysis works
 
@@ -154,7 +173,8 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 ## Features
 
 - [x] Import from CSV, JSON and Alertmanager-style JSON files
-- [ ] Import directly from PagerDuty, Opsgenie and a live Alertmanager
+- [x] Import directly from PagerDuty (`--source pagerduty`)
+- [ ] Import directly from Opsgenie and a live Alertmanager
 - [x] Detect flapping, never-acknowledged and duplicate alerts
 - [x] Per-alert noise score
 - [x] Suggested `for:` duration for flapping alerts
@@ -163,7 +183,7 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 
 ## Limitations
 
-- File input only. There is no `--source pagerduty` yet; you have to produce the export yourself.
+- PagerDuty is the only live source. For Opsgenie or Alertmanager history you still have to produce the export yourself.
 - "Acknowledged" is the only signal of human action. An alert that people act on without acknowledging will look ignored, and one that is acknowledged by reflex will look useful.
 - The tool sees only firing history, not metric values, so it cannot suggest thresholds. The `for:` suggestion is based purely on how long past firings lasted and also delays real alerts by that amount.
 - Duplicate detection compares firing start times pairwise. It finds alerts that fire together, not alerts that are merely similar in name or expression, and it does not group more than two.

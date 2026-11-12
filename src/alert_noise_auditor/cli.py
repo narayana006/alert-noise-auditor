@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import os
 import sys
 
 from . import __version__
 from .analysis import Settings, audit, filter_recent
-from .loader import InputError, load_file, load_text
+from .loader import AlertEvent, InputError, load_file, load_text
+from .pagerduty import fetch_incidents
 from .report import to_json, to_markdown
 
 
@@ -19,13 +22,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     analyze = sub.add_parser("analyze", help="analyze an alert history file")
-    analyze.add_argument("file", metavar="FILE", help="CSV or JSON alert history, or - for stdin")
+    analyze.add_argument("file", metavar="FILE", nargs="?",
+                         help="CSV or JSON alert history, or - for stdin (with --source file)")
+    analyze.add_argument("--source", choices=("file", "pagerduty"), default="file",
+                         help="where to read history from (default: file). pagerduty reads "
+                              "incidents with the token in PAGERDUTY_API_TOKEN")
+    analyze.add_argument("--pagerduty-service", action="append", default=[], metavar="ID",
+                         help="only PagerDuty incidents of this service ID (repeatable)")
+    analyze.add_argument("--save", metavar="CSV",
+                         help="also write the loaded history to CSV, to re-run offline later")
     analyze.add_argument("--input-format", choices=("auto", "csv", "json"), default="auto",
                          help="input format (default: from the file extension or content)")
     analyze.add_argument("--format", choices=("markdown", "json"), default="markdown",
                          help="output format (default: markdown)")
     analyze.add_argument("--days", type=float, metavar="N",
-                         help="only use the last N days, counted back from the newest event")
+                         help="only use the last N days, counted back from the newest event "
+                              "(with --source pagerduty: back from now, default 30)")
     analyze.add_argument("--top", type=int, metavar="N",
                          help="show only the N noisiest alerts in the Markdown report")
     analyze.add_argument("--flap-gap", type=float, default=defaults.flap_gap_minutes, metavar="MIN",
@@ -43,21 +55,49 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def save_csv(events: list[AlertEvent], path: str) -> None:
+    """Write events in the CSV input format, so the file can be analysed again."""
+    def stamp(moment):
+        return moment.isoformat().replace("+00:00", "Z") if moment else ""
+
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["name", "service", "severity", "fired_at", "acknowledged_at",
+                         "resolved_at"])
+        for e in events:
+            writer.writerow([e.name, e.service, e.severity, stamp(e.fired_at),
+                             stamp(e.acknowledged_at), stamp(e.resolved_at)])
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.source == "file" and args.file is None:
+        parser.error("FILE is required unless --source pagerduty is used")
+    if args.source != "file" and args.file is not None:
+        parser.error(f"FILE cannot be combined with --source {args.source}")
+    where = args.file if args.source == "file" else args.source
     try:
-        if args.file == "-":
+        if args.source == "pagerduty":
+            events = fetch_incidents(os.environ.get("PAGERDUTY_API_TOKEN", ""),
+                                     days=args.days if args.days is not None else 30.0,
+                                     service_ids=tuple(args.pagerduty_service))
+        elif args.file == "-":
             events = load_text(sys.stdin.read(), args.input_format)
         else:
             events = load_file(args.file, args.input_format)
+        if args.save:
+            save_csv(events, args.save)
     except (OSError, UnicodeDecodeError, InputError) as error:
-        print(f"alert-noise-auditor: {args.file}: {error}", file=sys.stderr)
+        print(f"alert-noise-auditor: {where}: {error}", file=sys.stderr)
         return 2
 
     settings = Settings(flap_gap_minutes=args.flap_gap,
                         duplicate_window_seconds=args.duplicate_window,
                         min_firings=args.min_firings)
-    result = audit(filter_recent(events, args.days), settings)
+    if args.source == "file":
+        events = filter_recent(events, args.days)  # PagerDuty already fetched only --days
+    result = audit(events, settings)
     print(to_json(result) if args.format == "json" else to_markdown(result, args.top), end="")
     if args.format == "json":
         print()
