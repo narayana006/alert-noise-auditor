@@ -10,6 +10,7 @@ import sys
 from . import __version__
 from .analysis import Settings, audit, filter_recent
 from .loader import AlertEvent, InputError, load_file, load_text
+from .opsgenie import fetch_alerts
 from .pagerduty import fetch_incidents
 from .report import to_json, to_markdown
 
@@ -24,11 +25,16 @@ def build_parser() -> argparse.ArgumentParser:
     analyze = sub.add_parser("analyze", help="analyze an alert history file")
     analyze.add_argument("file", metavar="FILE", nargs="?",
                          help="CSV or JSON alert history, or - for stdin (with --source file)")
-    analyze.add_argument("--source", choices=("file", "pagerduty"), default="file",
+    analyze.add_argument("--source", choices=("file", "pagerduty", "opsgenie"), default="file",
                          help="where to read history from (default: file). pagerduty reads "
-                              "incidents with the token in PAGERDUTY_API_TOKEN")
+                              "incidents with the token in PAGERDUTY_API_TOKEN; opsgenie reads "
+                              "alerts with the key in OPSGENIE_API_KEY")
     analyze.add_argument("--pagerduty-service", action="append", default=[], metavar="ID",
                          help="only PagerDuty incidents of this service ID (repeatable)")
+    analyze.add_argument("--opsgenie-query", default="", metavar="QUERY",
+                         help="Opsgenie search query to narrow the alerts, e.g. 'teams:payments'")
+    analyze.add_argument("--opsgenie-region", choices=("us", "eu"), default="us",
+                         help="Opsgenie API region (default: us)")
     analyze.add_argument("--save", metavar="CSV",
                          help="also write the loaded history to CSV, to re-run offline later")
     analyze.add_argument("--input-format", choices=("auto", "csv", "json"), default="auto",
@@ -37,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
                          help="output format (default: markdown)")
     analyze.add_argument("--days", type=float, metavar="N",
                          help="only use the last N days, counted back from the newest event "
-                              "(with --source pagerduty: back from now, default 30)")
+                              "(with --source pagerduty or opsgenie: back from now, default 30)")
     analyze.add_argument("--top", type=int, metavar="N",
                          help="show only the N noisiest alerts in the Markdown report")
     analyze.add_argument("--flap-gap", type=float, default=defaults.flap_gap_minutes, metavar="MIN",
@@ -73,14 +79,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.source == "file" and args.file is None:
-        parser.error("FILE is required unless --source pagerduty is used")
+        parser.error("FILE is required with --source file")
     if args.source != "file" and args.file is not None:
         parser.error(f"FILE cannot be combined with --source {args.source}")
     where = args.file if args.source == "file" else args.source
+    days = args.days if args.days is not None else 30.0
     try:
-        if args.source == "pagerduty":
+        if args.source == "opsgenie":
+            events = fetch_alerts(os.environ.get("OPSGENIE_API_KEY", ""), days=days,
+                                  query=args.opsgenie_query, region=args.opsgenie_region)
+        elif args.source == "pagerduty":
             events = fetch_incidents(os.environ.get("PAGERDUTY_API_TOKEN", ""),
-                                     days=args.days if args.days is not None else 30.0,
+                                     days=days,
                                      service_ids=tuple(args.pagerduty_service))
         elif args.file == "-":
             events = load_text(sys.stdin.read(), args.input_format)
@@ -96,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
                         duplicate_window_seconds=args.duplicate_window,
                         min_firings=args.min_firings)
     if args.source == "file":
-        events = filter_recent(events, args.days)  # PagerDuty already fetched only --days
+        events = filter_recent(events, args.days)  # remote sources fetched only --days
     result = audit(events, settings)
     print(to_json(result) if args.format == "json" else to_markdown(result, args.top), end="")
     if args.format == "json":

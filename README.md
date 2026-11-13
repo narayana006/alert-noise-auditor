@@ -2,7 +2,7 @@
 
 Reads an export of your alert history and tells you which alerts are noise: the ones that flap, the ones nobody ever acknowledges, and the ones that duplicate another alert. Each alert gets a noise score and a keep / tune / delete recommendation.
 
-**Status:** v0.1.0, usable from the command line. Working today: CSV, JSON and Alertmanager-style JSON input; reading incident history straight from PagerDuty; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: pulling history directly from Opsgenie or a live Alertmanager, and threshold suggestions.
+**Status:** v0.1.0, usable from the command line. Working today: CSV, JSON and Alertmanager-style JSON input; reading history straight from PagerDuty or Opsgenie; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: pulling history directly from a live Alertmanager, and threshold suggestions.
 
 ## Install
 
@@ -143,24 +143,43 @@ alert-noise-auditor analyze --source pagerduty --days 30 --save pd-history.csv
 
 This was tested against recorded API responses, not a live account. If your incident titles carry per-instance detail (host names, numbers), each variant is treated as its own alert; in that case `--save` the history, normalise the `name` column, and analyse the CSV.
 
+### Straight from Opsgenie
+
+With an Opsgenie API key that has the Read access right in `OPSGENIE_API_KEY`, the tool reads the alert list itself:
+
+```bash
+export OPSGENIE_API_KEY=...   # API key with Read access
+alert-noise-auditor analyze --source opsgenie --days 30 --opsgenie-query 'teams:payments' --save og-history.csv
+```
+
+- It sends only `GET /v2/alerts` requests, newest first, and stops paging at the first alert created before the `--days` window.
+- One Opsgenie alert is one firing. The alert **message** is the alert name, a `service:<name>` (or `service=<name>`) tag is the service (alerts without one have no service), and the priority (`p1` to `p5`) is the severity.
+- The acknowledged and resolved times come from the alert's `report.ackTime` and `report.closeTime`. If an alert is marked acknowledged or closed but the report has no time, its last update time is used. Open alerts count as unresolved.
+- `--opsgenie-query QUERY` passes an Opsgenie alert search query (for example `teams:payments` or `tag:prod`) to narrow the alerts.
+- `--opsgenie-region eu` uses `api.eu.opsgenie.com` instead of `api.opsgenie.com`.
+- Opsgenie lists at most 20,000 alerts per query. If the window holds more, the tool stops with an error asking for a shorter `--days` or a narrower query.
+
+This was tested against a fake API that serves responses in the documented shape, not a live account.
+
 ## Options
 
 ```text
-alert-noise-auditor analyze [--source {file,pagerduty}] [--pagerduty-service ID] [--save CSV]
+alert-noise-auditor analyze [--source {file,pagerduty,opsgenie}] [--pagerduty-service ID]
+                            [--opsgenie-query QUERY] [--opsgenie-region {us,eu}] [--save CSV]
                             [--input-format {auto,csv,json}] [--format {markdown,json}]
                             [--days N] [--top N] [--flap-gap MIN] [--duplicate-window SEC]
                             [--min-firings N] [--fail-on-delete] [FILE]
 ```
 
-- `FILE`: the export, or `-` for stdin. Required with the default `--source file`, not allowed with `--source pagerduty`. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
-- `--days N`: use only the last N days of the file, counted back from the newest event in it (not from today). With `--source pagerduty` it is the fetch window, counted back from now (default 30).
+- `FILE`: the export, or `-` for stdin. Required with the default `--source file`, not allowed with `--source pagerduty` or `opsgenie`. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
+- `--days N`: use only the last N days of the file, counted back from the newest event in it (not from today). With `--source pagerduty` or `opsgenie` it is the fetch window, counted back from now (default 30).
 - `--save CSV`: also write the loaded history as CSV.
 - `--format json`: the full per-alert statistics as JSON, for dashboards or further scripting.
 - `--top N`: show only the N noisiest alerts in the Markdown report.
 - `--flap-gap MIN` (default 30), `--duplicate-window SEC` (default 120), `--min-firings N` (default 3): detection settings, explained below.
 - `--fail-on-delete`: exit with status 1 when any alert is recommended for deletion.
 
-Exit status is 0 on success and 2 when the input cannot be read or parsed (the message names the offending line or record) or PagerDuty cannot be read (missing token, HTTP error).
+Exit status is 0 on success and 2 when the input cannot be read or parsed (the message names the offending line or record) or PagerDuty / Opsgenie cannot be read (missing key, HTTP error).
 
 ## How the analysis works
 
@@ -174,7 +193,8 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 
 - [x] Import from CSV, JSON and Alertmanager-style JSON files
 - [x] Import directly from PagerDuty (`--source pagerduty`)
-- [ ] Import directly from Opsgenie and a live Alertmanager
+- [x] Import directly from Opsgenie (`--source opsgenie`)
+- [ ] Import directly from a live Alertmanager
 - [x] Detect flapping, never-acknowledged and duplicate alerts
 - [x] Per-alert noise score
 - [x] Suggested `for:` duration for flapping alerts
@@ -183,7 +203,8 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 
 ## Limitations
 
-- PagerDuty is the only live source. For Opsgenie or Alertmanager history you still have to produce the export yourself.
+- PagerDuty and Opsgenie are the only live sources. For Alertmanager history you still have to produce the export yourself.
+- Opsgenie de-duplicates repeat notifications with the same alias into one alert (its `count` goes up). Those repeats are counted as one firing, so flapping that Opsgenie already folded together is not visible.
 - "Acknowledged" is the only signal of human action. An alert that people act on without acknowledging will look ignored, and one that is acknowledged by reflex will look useful.
 - The tool sees only firing history, not metric values, so it cannot suggest thresholds. The `for:` suggestion is based purely on how long past firings lasted and also delays real alerts by that amount.
 - Duplicate detection compares firing start times pairwise. It finds alerts that fire together, not alerts that are merely similar in name or expression, and it does not group more than two.

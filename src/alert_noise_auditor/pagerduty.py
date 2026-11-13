@@ -35,20 +35,26 @@ class SourceError(InputError):
     """The remote source could not be read."""
 
 
-def http_get_json(url: str, headers: dict, timeout: float = 30.0) -> dict:
+PAGERDUTY_HINTS = {401: " (check PAGERDUTY_API_TOKEN)", 403: " (the token lacks read access)",
+                   429: " (rate limited; try again shortly or narrow --days)"}
+
+
+def http_get_json(url: str, headers: dict, timeout: float = 30.0, label: str = "PagerDuty",
+                  hints: dict[int, str] | None = None) -> dict:
+    """GET ``url`` and decode the JSON body, turning failures into ``SourceError``."""
+    hints = PAGERDUTY_HINTS if hints is None else hints
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
-        hint = {401: " (check PAGERDUTY_API_TOKEN)", 403: " (the token lacks read access)",
-                429: " (rate limited; try again shortly or narrow --days)"}.get(error.code, "")
-        raise SourceError(f"PagerDuty returned HTTP {error.code} for {url.split('?')[0]}{hint}") \
+        hint = hints.get(error.code, "")
+        raise SourceError(f"{label} returned HTTP {error.code} for {url.split('?')[0]}{hint}") \
             from error
     except (urllib.error.URLError, TimeoutError) as error:
-        raise SourceError(f"cannot reach PagerDuty: {error}") from error
+        raise SourceError(f"cannot reach {label}: {error}") from error
     except json.JSONDecodeError as error:
-        raise SourceError(f"PagerDuty returned invalid JSON: {error}") from error
+        raise SourceError(f"{label} returned invalid JSON: {error}") from error
 
 
 def _iso(moment: datetime) -> str:
