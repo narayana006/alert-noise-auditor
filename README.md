@@ -2,7 +2,7 @@
 
 Reads an export of your alert history and tells you which alerts are noise: the ones that flap, the ones nobody ever acknowledges, and the ones that duplicate another alert. Each alert gets a noise score and a keep / tune / delete recommendation.
 
-**Status:** v0.1.0, usable from the command line. Working today: CSV, JSON and Alertmanager-style JSON input; reading history straight from PagerDuty or Opsgenie; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: pulling history directly from a live Alertmanager, and threshold suggestions.
+**Status:** v0.1.0, usable from the command line. Working today: CSV, JSON and Alertmanager-style JSON input; reading history straight from PagerDuty or Opsgenie; a snapshot of the alerts a live Alertmanager holds right now; flapping, never-acknowledged and duplicate detection; per-alert noise score; `for:` duration suggestions for flapping alerts; Markdown and JSON reports. Not built yet: threshold suggestions.
 
 ## Install
 
@@ -161,17 +161,41 @@ alert-noise-auditor analyze --source opsgenie --days 30 --opsgenie-query 'teams:
 
 This was tested against a fake API that serves responses in the documented shape, not a live account.
 
+### Snapshot of a live Alertmanager
+
+Alertmanager keeps no history, so this source gives a snapshot of the alerts it holds right now (firing, plus silenced and inhibited ones), not past firings:
+
+```bash
+export ALERTMANAGER_TOKEN=...   # optional bearer token, for a proxy that requires one
+alert-noise-auditor analyze --source alertmanager --alertmanager-url http://alertmanager:9093 --save snapshot.csv
+```
+
+- It sends one `GET <url>/api/v2/alerts` request. `--alertmanager-url` is the Alertmanager root, without `/api/v2`.
+- Labels are mapped as for the Alertmanager-style JSON input. Every returned alert is treated as unresolved, and there are no acknowledgements. `--days` drops alerts that started longer ago.
+- Output from a local test server holding two alerts:
+
+```markdown
+| Alert | Noise score | Recommendation | Firings | Ack rate | Flap rate | Median duration | Duplicate of |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HighMemoryUsage [node] | 8 | KEEP | 1 | n/a | 0% | n/a | - |
+| KafkaConsumerLag [orders-consumer] | 8 | KEEP | 1 | n/a | 0% | n/a | - |
+```
+
+- One snapshot rarely has enough firings to show flapping or duplicates. The useful way to use it is to run it on a schedule with `--save`, and to concatenate the CSVs or collect webhook notifications for a longer history.
+
+This was tested against a fake API that serves responses in the documented shape, not a live Alertmanager.
+
 ## Options
 
 ```text
-alert-noise-auditor analyze [--source {file,pagerduty,opsgenie}] [--pagerduty-service ID]
-                            [--opsgenie-query QUERY] [--opsgenie-region {us,eu}] [--save CSV]
+alert-noise-auditor analyze [--source {file,pagerduty,opsgenie,alertmanager}] [--pagerduty-service ID]
+                            [--alertmanager-url URL] [--opsgenie-query QUERY] [--opsgenie-region {us,eu}] [--save CSV]
                             [--input-format {auto,csv,json}] [--format {markdown,json}]
                             [--days N] [--top N] [--flap-gap MIN] [--duplicate-window SEC]
                             [--min-firings N] [--fail-on-delete] [FILE]
 ```
 
-- `FILE`: the export, or `-` for stdin. Required with the default `--source file`, not allowed with `--source pagerduty` or `opsgenie`. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
+- `FILE`: the export, or `-` for stdin. Required with the default `--source file`, not allowed with the other sources. The format comes from the extension, or from the content when there is no `.csv` / `.json` extension.
 - `--days N`: use only the last N days of the file, counted back from the newest event in it (not from today). With `--source pagerduty` or `opsgenie` it is the fetch window, counted back from now (default 30).
 - `--save CSV`: also write the loaded history as CSV.
 - `--format json`: the full per-alert statistics as JSON, for dashboards or further scripting.
@@ -194,7 +218,7 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 - [x] Import from CSV, JSON and Alertmanager-style JSON files
 - [x] Import directly from PagerDuty (`--source pagerduty`)
 - [x] Import directly from Opsgenie (`--source opsgenie`)
-- [ ] Import directly from a live Alertmanager
+- [x] Import a snapshot from a live Alertmanager (`--source alertmanager`)
 - [x] Detect flapping, never-acknowledged and duplicate alerts
 - [x] Per-alert noise score
 - [x] Suggested `for:` duration for flapping alerts
@@ -203,7 +227,7 @@ Exit status is 0 on success and 2 when the input cannot be read or parsed (the m
 
 ## Limitations
 
-- PagerDuty and Opsgenie are the only live sources. For Alertmanager history you still have to produce the export yourself.
+- PagerDuty and Opsgenie give history. Alertmanager only gives a snapshot of current alerts; for its history you still have to collect the webhook notifications yourself.
 - Opsgenie de-duplicates repeat notifications with the same alias into one alert (its `count` goes up). Those repeats are counted as one firing, so flapping that Opsgenie already folded together is not visible.
 - "Acknowledged" is the only signal of human action. An alert that people act on without acknowledging will look ignored, and one that is acknowledged by reflex will look useful.
 - The tool sees only firing history, not metric values, so it cannot suggest thresholds. The `for:` suggestion is based purely on how long past firings lasted and also delays real alerts by that amount.

@@ -10,6 +10,7 @@ import sys
 from . import __version__
 from .analysis import Settings, audit, filter_recent
 from .loader import AlertEvent, InputError, load_file, load_text
+from .alertmanager import fetch_alerts as fetch_alertmanager
 from .opsgenie import fetch_alerts
 from .pagerduty import fetch_incidents
 from .report import to_json, to_markdown
@@ -25,16 +26,21 @@ def build_parser() -> argparse.ArgumentParser:
     analyze = sub.add_parser("analyze", help="analyze an alert history file")
     analyze.add_argument("file", metavar="FILE", nargs="?",
                          help="CSV or JSON alert history, or - for stdin (with --source file)")
-    analyze.add_argument("--source", choices=("file", "pagerduty", "opsgenie"), default="file",
+    analyze.add_argument("--source", choices=("file", "pagerduty", "opsgenie", "alertmanager"), default="file",
                          help="where to read history from (default: file). pagerduty reads "
                               "incidents with the token in PAGERDUTY_API_TOKEN; opsgenie reads "
-                              "alerts with the key in OPSGENIE_API_KEY")
+                              "alerts with the key in OPSGENIE_API_KEY; alertmanager takes a "
+                              "snapshot of current alerts from --alertmanager-url")
     analyze.add_argument("--pagerduty-service", action="append", default=[], metavar="ID",
                          help="only PagerDuty incidents of this service ID (repeatable)")
     analyze.add_argument("--opsgenie-query", default="", metavar="QUERY",
                          help="Opsgenie search query to narrow the alerts, e.g. 'teams:payments'")
     analyze.add_argument("--opsgenie-region", choices=("us", "eu"), default="us",
                          help="Opsgenie API region (default: us)")
+    analyze.add_argument("--alertmanager-url", metavar="URL",
+                         help="Alertmanager base URL for --source alertmanager, e.g. "
+                              "http://alertmanager:9093; an optional bearer token is read from "
+                              "ALERTMANAGER_TOKEN")
     analyze.add_argument("--save", metavar="CSV",
                          help="also write the loaded history to CSV, to re-run offline later")
     analyze.add_argument("--input-format", choices=("auto", "csv", "json"), default="auto",
@@ -85,7 +91,11 @@ def main(argv: list[str] | None = None) -> int:
     where = args.file if args.source == "file" else args.source
     days = args.days if args.days is not None else 30.0
     try:
-        if args.source == "opsgenie":
+        if args.source == "alertmanager":
+            events = fetch_alertmanager(args.alertmanager_url or "",
+                                        token=os.environ.get("ALERTMANAGER_TOKEN", ""),
+                                        days=days)
+        elif args.source == "opsgenie":
             events = fetch_alerts(os.environ.get("OPSGENIE_API_KEY", ""), days=days,
                                   query=args.opsgenie_query, region=args.opsgenie_region)
         elif args.source == "pagerduty":
